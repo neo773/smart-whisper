@@ -99,8 +99,43 @@ Napi::Value WhisperModel::Load(const Napi::CallbackInfo &info) {
 
     std::string model_path = info[0].As<Napi::String>();
 
-    whisper_context_params params;
-    params.use_gpu = info.Length() == 2 ? info[1].As<Napi::Boolean>() : true;
+    // Initialize default params https://github.com/ggerganov/whisper.cpp/blob/fb36a1538a8a74921bd64d69c03baadb54217648/src/whisper.cpp#L3482-L3498
+    whisper_context_params params = {
+        true,    // use_gpu
+        false,   // flash_attn
+        0,       // gpu_device
+        false,   // dtw_token_timestamps
+        WHISPER_AHEADS_NONE, // dtw_aheads_preset
+        -1,      // dtw_n_top
+        {0, NULL}, // dtw_aheads
+        1024*1024*128, // dtw_mem_size
+    };
+
+    // Handle boolean case for backward compatibility
+    if (info.Length() == 2 && info[1].IsBoolean()) {
+        params.use_gpu = info[1].As<Napi::Boolean>();
+    }
+    // Handle object case
+    else if (info.Length() == 2 && info[1].IsObject()) {
+        Napi::Object obj = info[1].As<Napi::Object>();
+        
+        if (obj.Has("use_gpu"))
+            params.use_gpu = obj.Get("use_gpu").As<Napi::Boolean>();
+        if (obj.Has("flash_attn"))
+            params.flash_attn = obj.Get("flash_attn").As<Napi::Boolean>();
+        if (obj.Has("gpu_device"))
+            params.gpu_device = obj.Get("gpu_device").As<Napi::Number>().Int32Value();
+        if (obj.Has("dtw_token_timestamps"))
+            params.dtw_token_timestamps = obj.Get("dtw_token_timestamps").As<Napi::Boolean>();
+        if (obj.Has("dtw_aheads_preset"))
+            params.dtw_aheads_preset = static_cast<whisper_alignment_heads_preset>(
+                obj.Get("dtw_aheads_preset").As<Napi::Number>().Int32Value()
+            );
+        if (obj.Has("dtw_n_top"))
+            params.dtw_n_top = obj.Get("dtw_n_top").As<Napi::Number>().Int32Value();
+        if (obj.Has("dtw_mem_size"))
+            params.dtw_mem_size = obj.Get("dtw_mem_size").As<Napi::Number>().Int32Value();
+    }
 
     auto worker = new LoadModelWorker(env, model_path, params);
     worker->Queue();

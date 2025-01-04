@@ -1,8 +1,9 @@
 import type { TranscribeFormat, TranscribeParams, TranscribeResult } from "./types";
 import { WhisperModel } from "./model";
 import { TranscribeTask } from "./transcribe";
+import { WhisperContextParams } from "./binding";
 
-export interface WhisperConfig {
+interface WhisperConfig {
 	/**
 	 * Time in seconds to wait before offloading the model if it's not being used.
 	 */
@@ -12,6 +13,11 @@ export interface WhisperConfig {
 	 * Whether to use the GPU or not.
 	 */
 	gpu: boolean;
+
+	/**
+	 * Advanced configuration parameters
+	 */
+	params?: WhisperContextParams;
 }
 
 /**
@@ -91,7 +97,15 @@ export class Whisper {
 			return this._loading;
 		}
 
-		const model = WhisperModel.load(this.file, this.config.gpu);
+		const params: WhisperContextParams = {
+			use_gpu: this._config.gpu,
+			...this._config.params,
+		};
+
+		const model = WhisperModel.load(this.file, {
+			...this._config,
+			params,
+		});
 		this._loading = model;
 		this._available = await model;
 		this._loading = null;
